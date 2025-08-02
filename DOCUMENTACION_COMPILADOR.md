@@ -574,18 +574,5 @@ if (x > y && x < 10) {
 
 ---
 
-## CONCLUSIÓN
 
-Este mini compilador es una herramienta educativa completa que demuestra todos los conceptos fundamentales de la compilación de lenguajes de programación. Incluye:
-
-- **Análisis léxico completo**
-- **Análisis sintáctico con AST**
-- **Optimizaciones básicas**
-- **Análisis semántico**
-- **Generación de código**
-- **Interfaz web funcional**
-
-
-
----
 
