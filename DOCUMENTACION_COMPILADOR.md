@@ -5,8 +5,7 @@
 **Nombre:** Mini Compilador  
 **Versión:** 1.0  
 **Lenguaje de Programación:** JavaScript (HTML/CSS/JS)  
-**Fecha de Creación:** 2024  
-**Propósito:** Compilador educativo con todas las etapas de compilación
+
 
 ---
 
@@ -28,10 +27,7 @@ Código Fuente → Análisis Léxico → Análisis Sintáctico → Transformaci�
 
 ---
 
-## LENGUAJE DE PROGRAMACIÓN
 
-### **Nombre:** MiniLang
-**Descripción:** Lenguaje de programación simple y educativo diseñado para demostrar los conceptos de compilación.
 
 ### **Características del Lenguaje:**
 
@@ -589,9 +585,7 @@ Este mini compilador es una herramienta educativa completa que demuestra todos l
 - **Generación de código**
 - **Interfaz web funcional**
 
-**Ideal para:** Estudiantes de compiladores, programadores que quieren entender el proceso de compilación, y educadores que enseñan conceptos de lenguajes de programación.
+
 
 ---
 
-*Documentación creada para el Mini Compilador v1.0*
-*Fecha: 2024* 
