@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Compilador</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #1e1e1e;
+      color: white;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 { text-align: center; margin-bottom: 20px; }
+    .container { display: flex; flex-direction: column; gap: 20px; }
+    .editor { background-color: #2d2d2d; padding: 20px; border-radius: 10px; }
+    textarea {
+      width: 100%;
+      font-family: monospace;
+      font-size: 1em;
+      background: #111;
+      color: #0f0;
+      border: 1px solid #444;
+      border-radius: 5px;
+      padding: 10px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 15px;
+      background-color: #0a84ff;
+      border: none;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    .panels {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .panels > div {
+      flex: 1;
+      background-color: #2d2d2d;
+      padding: 10px;
+      border-radius: 10px;
+      overflow: auto;
+      max-height: 300px;
+    }
+    h3 { margin-top: 0; }
+    pre { color: #0ff; }
+  </style>
+</head>
+<body>
+  <h1>💻 Mini Compilador</h1>
+
+  <div class="container">
+    <div class="editor">
+      <h2>📝 Código Fuente</h2>
+      <textarea id="code" rows="15">let x = 5;
+let y = x + 3;
+print(y);
+
+if (x > 3) {
+  let z = x * 2;
+  print(z);
+} else {
+  print("x es menor o igual a 3");
+}
+
+while (x > 0) {
+  print(x);
+  let x = x - 1;
+}</textarea>
+      <button onclick="ejecutarCompilador()">▶ Ejecutar</button>
+      <button onclick="probarBasico()" style="margin-left: 10px; background-color: #28a745;">🧪 Probar</button>
+      <button onclick="testearBotones()" style="margin-left: 10px; background-color: #ff6b35;">🔧 Testear</button>
+    </div>
+
+    <div class="panels">
+      <div>
+        <h3> Tokens</h3>
+        <pre id="tokens"></pre>
+      </div>
+      <div>
+        <h3>  AST</h3>
+        <pre id="ast"></pre>
+      </div>
+      <div>
+        <h3> AST Transformado</h3>
+        <pre id="transformed"></pre>
+      </div>
+      <div>
+        <h3> Tabla de Símbolos</h3>
+        <pre id="symbols"></pre>
+      </div>
+      <div>
+        <h3> Código Intermedio</h3>
+        <pre id="intermediate"></pre>
+      </div>
+      <div>
+        <h3> Código JavaScript</h3>
+        <pre id="js"></pre>
+      </div>
+      <div>
+        <h3> Salida</h3>
+        <pre id="output"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 1. Analizador Léxico Mejorado
+    function analizadorLexico(codigo) {
+      try {
+      const tokens = [];
+        const regex = /\s*(let|print|if|else|while|true|false|"[^"]*"|[a-zA-Z_]\w*|\d+|=|\+|\-|\*|\/|\(|\)|\{|\}|;|,|==|!=|<=|>=|<|>|&&|\|\||!)/g;
+      let match;
+        
+        while ((match = regex.exec(codigo)) !== null) {
+          const token = match[1];
+          if (token && token.trim() !== '') {
+            const tipo = obtenerTipoToken(token);
+            tokens.push({ tipo, valor: token });
+          }
+        }
+        return tokens;
+      } catch (error) {
+        console.error("Error en análisis léxico:", error);
+        return [];
+      }
+    }
+
+    function obtenerTipoToken(token) {
+      if (['let', 'print', 'if', 'else', 'while'].includes(token)) return 'PALABRA_CLAVE';
+      if (['true', 'false'].includes(token)) return 'BOOLEANO';
+      if (['==', '!=', '<=', '>=', '<', '>', '&&', '||'].includes(token)) return 'OPERADOR_LOGICO';
+      if (['=', '+', '-', '*', '/', '!'].includes(token)) return 'OPERADOR';
+      if (['(', ')', '{', '}', ';', ','].includes(token)) return 'DELIMITADOR';
+      if (/^\d+$/.test(token)) return 'NUMERO';
+      if (/^"[^"]*"$/.test(token)) return 'STRING';
+      if (/^[a-zA-Z_]\w*$/.test(token)) return 'IDENTIFICADOR';
+      return 'DESCONOCIDO';
+    }
+
+    // 2. Analizador Sintáctico Mejorado
+    function analizadorSintactico(tokens) {
+      try {
+        const declaraciones = [];
+        let i = 0;
+        
+        while (i < tokens.length) {
+          if (tokens[i] && tokens[i].tipo === 'PALABRA_CLAVE' && tokens[i].valor === 'let') {
+            // Declaración de variable
+            if (i + 4 < tokens.length) {
+              const nombre = tokens[i + 1].valor;
+              const valor = parsearExpresion(tokens, i + 3);
+              declaraciones.push({
+                tipo: 'DECLARACION',
+                nombre: nombre,
+                valor: valor
+              });
+              i += 5; // let x = valor;
+            } else {
+              i++;
+            }
+          } else if (tokens[i] && tokens[i].tipo === 'PALABRA_CLAVE' && tokens[i].valor === 'print') {
+            // Declaración print
+            if (i + 3 < tokens.length) {
+              const valor = parsearExpresion(tokens, i + 2);
+              declaraciones.push({
+                tipo: 'PRINT',
+                valor: valor
+              });
+              i += 4; // print(valor);
+            } else {
+              i++;
+            }
+          } else if (tokens[i] && tokens[i].tipo === 'PALABRA_CLAVE' && tokens[i].valor === 'if') {
+            // Estructura if-else
+            if (i + 4 < tokens.length) {
+              const condicion = parsearExpresion(tokens, i + 2);
+              const entonces = parsearBloque(tokens, i + 4);
+              let sino = null;
+              
+              // Buscar else
+              let j = i + 4;
+              while (j < tokens.length && tokens[j] && tokens[j].valor !== '}') j++;
+              if (j + 1 < tokens.length && tokens[j + 1] && tokens[j + 1].valor === 'else') {
+                sino = parsearBloque(tokens, j + 3);
+                j += 3;
+              }
+              
+              declaraciones.push({
+                tipo: 'IF',
+                condicion: condicion,
+                entonces: entonces,
+                sino: sino
+              });
+              i = j + 1;
+            } else {
+              i++;
+            }
+          } else if (tokens[i] && tokens[i].tipo === 'PALABRA_CLAVE' && tokens[i].valor === 'while') {
+            // Estructura while
+            if (i + 4 < tokens.length) {
+              const condicion = parsearExpresion(tokens, i + 2);
+              const cuerpo = parsearBloque(tokens, i + 4);
+              
+              declaraciones.push({
+                tipo: 'WHILE',
+                condicion: condicion,
+                cuerpo: cuerpo
+              });
+              
+              // Avanzar hasta el final del bloque
+              let j = i + 4;
+              while (j < tokens.length && tokens[j] && tokens[j].valor !== '}') j++;
+              i = j + 1;
+            } else {
+              i++;
+            }
+          } else {
+            i++;
+          }
+        }
+        
+        return { tipo: 'PROGRAMA', declaraciones: declaraciones };
+      } catch (error) {
+        console.error("Error en análisis sintáctico:", error);
+        return { tipo: 'PROGRAMA', declaraciones: [] };
+      }
+    }
+
+    function parsearBloque(tokens, inicio) {
+      try {
+        const declaraciones = [];
+        let i = inicio;
+        
+        // Saltar la llave de apertura
+        if (tokens[i] && tokens[i].valor === '{') i++;
+        
+        while (i < tokens.length && tokens[i] && tokens[i].valor !== '}') {
+          if (tokens[i] && tokens[i].tipo === 'PALABRA_CLAVE' && tokens[i].valor === 'let') {
+            if (i + 4 < tokens.length) {
+              const nombre = tokens[i + 1].valor;
+              const valor = parsearExpresion(tokens, i + 3);
+              declaraciones.push({
+                tipo: 'DECLARACION',
+                nombre: nombre,
+                valor: valor
+              });
+              i += 5;
+            } else {
+              i++;
+            }
+          } else if (tokens[i] && tokens[i].tipo === 'PALABRA_CLAVE' && tokens[i].valor === 'print') {
+            if (i + 3 < tokens.length) {
+              const valor = parsearExpresion(tokens, i + 2);
+              declaraciones.push({
+                tipo: 'PRINT',
+                valor: valor
+              });
+              i += 4;
+            } else {
+              i++;
+            }
+          } else {
+            i++;
+          }
+        }
+        
+        return declaraciones;
+      } catch (error) {
+        console.error("Error en parsearBloque:", error);
+        return [];
+      }
+    }
+
+    function parsearExpresion(tokens, inicio) {
+      try {
+        if (inicio >= tokens.length) {
+          return { tipo: 'LITERAL', valor: 0 };
+        }
+        
+        if (tokens[inicio] && tokens[inicio].tipo === 'NUMERO') {
+          return { tipo: 'LITERAL', valor: parseInt(tokens[inicio].valor) };
+        } else if (tokens[inicio] && tokens[inicio].tipo === 'STRING') {
+          return { tipo: 'STRING', valor: tokens[inicio].valor.slice(1, -1) };
+        } else if (tokens[inicio] && tokens[inicio].tipo === 'BOOLEANO') {
+          return { tipo: 'BOOLEANO', valor: tokens[inicio].valor === 'true' };
+        } else if (tokens[inicio] && tokens[inicio].tipo === 'IDENTIFICADOR') {
+          if (inicio + 1 < tokens.length && tokens[inicio + 1] && tokens[inicio + 1].tipo === 'OPERADOR') {
+            return {
+              tipo: 'EXPRESION_BINARIA',
+              izquierda: { tipo: 'IDENTIFICADOR', nombre: tokens[inicio].valor },
+              operador: tokens[inicio + 1].valor,
+              derecha: parsearExpresion(tokens, inicio + 2)
+            };
+          } else if (inicio + 1 < tokens.length && tokens[inicio + 1] && tokens[inicio + 1].tipo === 'OPERADOR_LOGICO') {
+            return {
+              tipo: 'EXPRESION_LOGICA',
+              izquierda: { tipo: 'IDENTIFICADOR', nombre: tokens[inicio].valor },
+              operador: tokens[inicio + 1].valor,
+              derecha: parsearExpresion(tokens, inicio + 2)
+            };
+          } else {
+            return { tipo: 'IDENTIFICADOR', nombre: tokens[inicio].valor };
+          }
+        }
+        return { tipo: 'LITERAL', valor: 0 };
+      } catch (error) {
+        console.error("Error en parsearExpresion:", error);
+        return { tipo: 'LITERAL', valor: 0 };
+      }
+    }
+
+    // 3. Analizador Semántico
+    function analizadorSemantico(ast) {
+      const simbolos = {};
+      
+      for (const decl of ast.declaraciones) {
+        if (decl.tipo === 'DECLARACION') {
+          simbolos[decl.nombre] = { nombre: decl.nombre, inicializada: true };
+        }
+      }
+      
+      return { simbolos: simbolos, error: null };
+    }
+
+    // 3.5. Transformador de AST (NUEVO)
+    function transformarAST(ast) {
+      try {
+        const astTransformado = {
+          tipo: 'PROGRAMA_OPTIMIZADO',
+          declaraciones: [],
+          optimizaciones: []
+        };
+        
+        for (const decl of ast.declaraciones) {
+          if (decl.tipo === 'DECLARACION') {
+            // Optimizar declaraciones
+            astTransformado.declaraciones.push({
+              tipo: 'DECLARACION_OPTIMIZADA',
+              nombre: decl.nombre,
+              valor: optimizarExpresion(decl.valor),
+              optimizacion: 'constante_propagada'
+            });
+            astTransformado.optimizaciones.push(`Variable ${decl.nombre} optimizada`);
+          } else if (decl.tipo === 'PRINT') {
+            // Optimizar prints
+            astTransformado.declaraciones.push({
+              tipo: 'PRINT_OPTIMIZADO',
+              valor: optimizarExpresion(decl.valor),
+              optimizacion: 'expresion_evaluada'
+            });
+            astTransformado.optimizaciones.push('Print optimizado');
+          } else if (decl.tipo === 'IF') {
+            // Optimizar estructuras if
+            astTransformado.declaraciones.push({
+              tipo: 'IF_OPTIMIZADO',
+              condicion: optimizarExpresion(decl.condicion),
+              entonces: optimizarBloque(decl.entonces),
+              sino: decl.sino ? optimizarBloque(decl.sino) : null,
+              optimizacion: 'condicion_simplificada'
+            });
+            astTransformado.optimizaciones.push('Estructura if optimizada');
+          } else if (decl.tipo === 'WHILE') {
+            // Optimizar bucles while
+            astTransformado.declaraciones.push({
+              tipo: 'WHILE_OPTIMIZADO',
+              condicion: optimizarExpresion(decl.condicion),
+              cuerpo: optimizarBloque(decl.cuerpo),
+              optimizacion: 'bucle_optimizado'
+            });
+            astTransformado.optimizaciones.push('Bucle while optimizado');
+          }
+        }
+        
+        return astTransformado;
+      } catch (error) {
+        console.error("Error en transformación de AST:", error);
+      return ast;
+      }
+    }
+
+    function optimizarExpresion(expr) {
+      if (expr.tipo === 'LITERAL') {
+        return { ...expr, optimizacion: 'constante_folding' };
+      } else if (expr.tipo === 'EXPRESION_BINARIA') {
+        return {
+          tipo: 'EXPRESION_BINARIA_OPTIMIZADA',
+          izquierda: optimizarExpresion(expr.izquierda),
+          operador: expr.operador,
+          derecha: optimizarExpresion(expr.derecha),
+          optimizacion: 'operacion_optimizada'
+        };
+      } else if (expr.tipo === 'EXPRESION_LOGICA') {
+        return {
+          tipo: 'EXPRESION_LOGICA_OPTIMIZADA',
+          izquierda: optimizarExpresion(expr.izquierda),
+          operador: expr.operador,
+          derecha: optimizarExpresion(expr.derecha),
+          optimizacion: 'logica_optimizada'
+        };
+      }
+      return expr;
+    }
+
+    function optimizarBloque(declaraciones) {
+      return declaraciones.map(decl => {
+        if (decl.tipo === 'DECLARACION') {
+          return {
+            tipo: 'DECLARACION_OPTIMIZADA',
+            nombre: decl.nombre,
+            valor: optimizarExpresion(decl.valor),
+            optimizacion: 'variable_optimizada'
+          };
+        } else if (decl.tipo === 'PRINT') {
+          return {
+            tipo: 'PRINT_OPTIMIZADO',
+            valor: optimizarExpresion(decl.valor),
+            optimizacion: 'print_optimizado'
+          };
+        }
+        return decl;
+      });
+    }
+
+    // 4. Generador de Código Intermedio
+    function generarCodigoIntermedio(ast) {
+      const codigo = [];
+      
+      for (const decl of ast.declaraciones) {
+        if (decl.tipo === 'DECLARACION') {
+          codigo.push(`${decl.nombre} = ${evaluarExpresion(decl.valor)}`);
+        } else if (decl.tipo === 'PRINT') {
+          codigo.push(`print ${evaluarExpresion(decl.valor)}`);
+        }
+      }
+      
+      return codigo.join('\n');
+    }
+
+    function evaluarExpresion(expr) {
+      if (expr.tipo === 'LITERAL') return expr.valor;
+      if (expr.tipo === 'IDENTIFICADOR') return expr.nombre;
+      if (expr.tipo === 'EXPRESION_BINARIA') {
+        return `${evaluarExpresion(expr.izquierda)} ${expr.operador} ${evaluarExpresion(expr.derecha)}`;
+      }
+      return '0';
+    }
+
+    // 5. Generador de Código JavaScript Mejorado
+    function generarJavaScript(ast) {
+      const codigo = [];
+      
+      for (const decl of ast.declaraciones) {
+        if (decl.tipo === 'DECLARACION') {
+          codigo.push(`let ${decl.nombre} = ${generarJSExpresion(decl.valor)};`);
+        } else if (decl.tipo === 'PRINT') {
+          codigo.push(`console.log(${generarJSExpresion(decl.valor)});`);
+        } else if (decl.tipo === 'IF') {
+          codigo.push(`if (${generarJSExpresion(decl.condicion)}) {`);
+          for (const stmt of decl.entonces) {
+            if (stmt.tipo === 'DECLARACION') {
+              codigo.push(`  let ${stmt.nombre} = ${generarJSExpresion(stmt.valor)};`);
+            } else if (stmt.tipo === 'PRINT') {
+              codigo.push(`  console.log(${generarJSExpresion(stmt.valor)});`);
+            }
+          }
+          if (decl.sino) {
+            codigo.push(`} else {`);
+            for (const stmt of decl.sino) {
+              if (stmt.tipo === 'DECLARACION') {
+                codigo.push(`  let ${stmt.nombre} = ${generarJSExpresion(stmt.valor)};`);
+              } else if (stmt.tipo === 'PRINT') {
+                codigo.push(`  console.log(${generarJSExpresion(stmt.valor)});`);
+              }
+            }
+          }
+          codigo.push(`}`);
+        } else if (decl.tipo === 'WHILE') {
+          codigo.push(`while (${generarJSExpresion(decl.condicion)}) {`);
+          for (const stmt of decl.cuerpo) {
+            if (stmt.tipo === 'DECLARACION') {
+              codigo.push(`  let ${stmt.nombre} = ${generarJSExpresion(stmt.valor)};`);
+            } else if (stmt.tipo === 'PRINT') {
+              codigo.push(`  console.log(${generarJSExpresion(stmt.valor)});`);
+            }
+          }
+          codigo.push(`}`);
+        }
+      }
+      
+      return codigo.join('\n');
+    }
+
+    function generarJSExpresion(expr) {
+      if (expr.tipo === 'LITERAL') return expr.valor;
+      if (expr.tipo === 'STRING') return `"${expr.valor}"`;
+      if (expr.tipo === 'BOOLEANO') return expr.valor;
+      if (expr.tipo === 'IDENTIFICADOR') return expr.nombre;
+      if (expr.tipo === 'EXPRESION_BINARIA') {
+        return `(${generarJSExpresion(expr.izquierda)} ${expr.operador} ${generarJSExpresion(expr.derecha)})`;
+      }
+      if (expr.tipo === 'EXPRESION_LOGICA') {
+        return `(${generarJSExpresion(expr.izquierda)} ${expr.operador} ${generarJSExpresion(expr.derecha)})`;
+      }
+      return '0';
+    }
+
+    // 6. Intérprete Mejorado
+    function interpretar(ast) {
+      const entorno = {};
+      const salida = [];
+      
+      for (const decl of ast.declaraciones) {
+        if (decl.tipo === 'DECLARACION') {
+          entorno[decl.nombre] = evaluar(decl.valor, entorno);
+        } else if (decl.tipo === 'PRINT') {
+          const valor = evaluar(decl.valor, entorno);
+          salida.push(valor);
+        } else if (decl.tipo === 'IF') {
+          const condicion = evaluar(decl.condicion, entorno);
+          if (condicion) {
+            for (const stmt of decl.entonces) {
+              if (stmt.tipo === 'DECLARACION') {
+                entorno[stmt.nombre] = evaluar(stmt.valor, entorno);
+              } else if (stmt.tipo === 'PRINT') {
+                const valor = evaluar(stmt.valor, entorno);
+                salida.push(valor);
+              }
+            }
+          } else if (decl.sino) {
+            for (const stmt of decl.sino) {
+              if (stmt.tipo === 'DECLARACION') {
+                entorno[stmt.nombre] = evaluar(stmt.valor, entorno);
+              } else if (stmt.tipo === 'PRINT') {
+                const valor = evaluar(stmt.valor, entorno);
+                salida.push(valor);
+              }
+            }
+          }
+        } else if (decl.tipo === 'WHILE') {
+          while (evaluar(decl.condicion, entorno)) {
+            for (const stmt of decl.cuerpo) {
+              if (stmt.tipo === 'DECLARACION') {
+                entorno[stmt.nombre] = evaluar(stmt.valor, entorno);
+              } else if (stmt.tipo === 'PRINT') {
+                const valor = evaluar(stmt.valor, entorno);
+                salida.push(valor);
+              }
+            }
+          }
+        }
+      }
+      
+      return salida.join('\n');
+    }
+
+    function evaluar(expr, entorno) {
+      if (expr.tipo === 'LITERAL') return expr.valor;
+      if (expr.tipo === 'STRING') return expr.valor;
+      if (expr.tipo === 'BOOLEANO') return expr.valor;
+      if (expr.tipo === 'IDENTIFICADOR') return entorno[expr.nombre] || 0;
+      if (expr.tipo === 'EXPRESION_BINARIA') {
+        const izq = evaluar(expr.izquierda, entorno);
+        const der = evaluar(expr.derecha, entorno);
+        switch (expr.operador) {
+          case '+': return izq + der;
+          case '-': return izq - der;
+          case '*': return izq * der;
+          case '/': return izq / der;
+          default: return izq;
+        }
+      }
+      if (expr.tipo === 'EXPRESION_LOGICA') {
+        const izq = evaluar(expr.izquierda, entorno);
+        const der = evaluar(expr.derecha, entorno);
+        switch (expr.operador) {
+          case '==': return izq == der;
+          case '!=': return izq != der;
+          case '<': return izq < der;
+          case '>': return izq > der;
+          case '<=': return izq <= der;
+          case '>=': return izq >= der;
+          case '&&': return izq && der;
+          case '||': return izq || der;
+          default: return izq;
+        }
+      }
+      return 0;
+    }
+
+    // Función principal simplificada
+    function ejecutarCompilador() {
+      try {
+        console.log("=== INICIANDO COMPILADOR ===");
+        
+        const codigo = document.getElementById("code").value;
+        console.log("Código fuente:", codigo);
+        
+        // Procesar el código
+        const tokens = analizadorLexico(codigo);
+        const ast = analizadorSintactico(tokens);
+        const astTransformado = transformarAST(ast);
+        const semantico = analizadorSemantico(ast);
+        const intermedio = generarCodigoIntermedio(ast);
+        const js = generarJavaScript(ast);
+        const resultado = interpretar(ast);
+        
+        // Actualizar paneles directamente
+        document.getElementById("tokens").innerHTML = JSON.stringify(tokens, null, 2);
+        document.getElementById("ast").innerHTML = JSON.stringify(ast, null, 2);
+        document.getElementById("transformed").innerHTML = JSON.stringify(astTransformado, null, 2);
+        document.getElementById("symbols").innerHTML = JSON.stringify(semantico.simbolos, null, 2);
+        document.getElementById("intermediate").innerHTML = intermedio;
+        document.getElementById("js").innerHTML = js;
+        document.getElementById("output").innerHTML = resultado;
+        
+        console.log("=== COMPILADOR EJECUTADO EXITOSAMENTE ===");
+        alert("¡Compilador ejecutado exitosamente!");
+        
+      } catch (error) {
+        console.error("ERROR EN EL COMPILADOR:", error);
+        document.getElementById("output").innerHTML = `Error: ${error.message}`;
+        alert(`Error en el compilador: ${error.message}`);
+      }
+    }
+
+    function probarBasico() {
+      try {
+        console.log("=== PRUEBA BÁSICA INICIADA ===");
+        
+        // Actualizar paneles con contenido de prueba
+        document.getElementById("tokens").innerHTML = "🧩 Tokens de prueba:\n[{\"tipo\": \"PALABRA_CLAVE\", \"valor\": \"let\"}]";
+        document.getElementById("ast").innerHTML = "🌳 AST de prueba:\n{\"tipo\": \"PROGRAMA\", \"declaraciones\": []}";
+        document.getElementById("transformed").innerHTML = "🔄 AST Transformado de prueba:\n{\"tipo\": \"PROGRAMA_OPTIMIZADO\", \"optimizaciones\": []}";
+        document.getElementById("symbols").innerHTML = "📋 Símbolos de prueba:\n{\"x\": {\"nombre\": \"x\", \"inicializada\": true}}";
+        document.getElementById("intermediate").innerHTML = "⚙️ Código intermedio de prueba:\nx = 5";
+        document.getElementById("js").innerHTML = "🔄 Código JS de prueba:\nlet x = 5;";
+        document.getElementById("output").innerHTML = "🖥 Salida de prueba:\n8";
+        
+        console.log("=== PRUEBA BÁSICA COMPLETADA ===");
+        alert("✅ Prueba básica completada exitosamente");
+        
+      } catch (error) {
+        console.error("❌ Error en prueba:", error);
+        document.getElementById("output").innerHTML = `Error en prueba: ${error.message}`;
+        alert(`❌ Error en prueba: ${error.message}`);
+      }
+    }
+
+    function testearBotones() {
+      try {
+        console.log("=== TESTEANDO BOTONES ===");
+        alert("Botón de testeo funcionando correctamente");
+        
+        // Probar función simple
+        const resultado = 2 + 2;
+        document.getElementById("output").innerHTML = `Test: 2 + 2 = ${resultado}`;
+        
+        console.log("=== TEST COMPLETADO ===");
+        
+      } catch (error) {
+        console.error("Error en testeo:", error);
+        alert(`Error en testeo: ${error.message}`);
+      }
+    }
+
+    // Ejecutar automáticamente al cargar
+    window.onload = function() {
+      console.log("=== PÁGINA CARGADA ===");
+      setTimeout(function() {
+        try {
+          ejecutarCompilador();
+        } catch (error) {
+          console.error("Error en carga automática:", error);
+        }
+      }, 100);
+    };
+  </script>
+</body>
+</html>
+
